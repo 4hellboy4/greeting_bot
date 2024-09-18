@@ -1,27 +1,21 @@
 import asyncio
-from aiogram import types, Router
-from aiogram.filters import ChatMemberUpdatedFilter, IS_MEMBER, IS_NOT_MEMBER
-
+from aiogram import types, Router, F
 from bot.utils import send_welcome_message
 
 router = Router()
 
 
-# Обработчик события, когда пользователь присоединяется к чату
-@router.chat_member(ChatMemberUpdatedFilter(IS_NOT_MEMBER >> IS_MEMBER))
-async def on_user_join(message: types.ChatMemberUpdated):
-    from bot.loader import bot
-    try:
-        chat_id = message.chat.id
-        new_member = message.from_user
+@router.message(F.new_chat_members)
+async def greeting(message: types.Message):
+    # from bot.loader import bot
+    chat_id = message.chat.id
+    for new_member in message.new_chat_members:
         username = new_member.full_name
         id_user = new_member.id
 
-        # Получение приветственного сообщения
         welcome_message = await send_welcome_message(id_user, username)
 
-        # Отправка приветственного фото
-        send_msg = await bot.send_photo(
+        send_msg = await message.bot.send_photo(
             chat_id=chat_id,
             photo=welcome_message['photo'],
             caption=welcome_message['caption'],
@@ -29,10 +23,22 @@ async def on_user_join(message: types.ChatMemberUpdated):
             reply_markup=welcome_message['markup'],
         )
 
-        # Задержка перед удалением сообщения
         await asyncio.sleep(30)
 
-        # Удаление сообщения
-        await bot.delete_message(chat_id=chat_id, message_id=send_msg.message_id)
-    except Exception as e:
-        print(f"Something went wrong: {e}")
+        await message.bot.delete_message(chat_id=chat_id, message_id=send_msg.message_id)
+
+@router.message(F.left_chat_member)
+async def bye_bye(message: types.Message):
+    # from bot.loader import bot
+    print('left')
+    chat_id = message.chat.id
+    left_user = message.left_chat_member
+    user_id =left_user.id
+    username = left_user.full_name
+
+    left_message = f'Пользователь <a href="tg://user?id={user_id}">{username}</a>! покинул чат.'
+    send_msg = await message.bot.send_message(chat_id=chat_id, text=left_message, parse_mode='HTML')
+
+    await asyncio.sleep(10)
+
+    await message.bot.delete_message(chat_id=chat_id, message_id=send_msg.message_id)
